@@ -1,0 +1,8 @@
+{
+  "name": "pii-redactor",
+  "version": "1.0.0",
+  "description": "Finds and redacts personal data in text. Runs entirely in the browser — nothing is uploaded.",
+  "main": "detect.js",
+  "scripts": { "test": "node test.js" },
+  "license": "MIT"
+}

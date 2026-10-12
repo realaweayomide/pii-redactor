@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PII Redactor — find and mask personal data, without uploading it</title>
+<meta name="description" content="Finds emails, cards, IBANs, API keys, SSNs and more in text, and redacts them. Runs entirely in your browser — nothing is ever uploaded.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://realaweayomide.github.io/pii-redactor/">
+<meta property="og:title" content="PII Redactor — redaction that never uploads your data">
+<meta property="og:description" content="A redaction tool that sends your document to a server is an oxymoron. This one runs entirely in your browser.">
+<meta property="og:image" content="https://realaweayomide.github.io/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0b0d12;--card:#141824;--soft:#11141b;--line:#232838;--text:#e8ebf2;--muted:#9aa3b5;
+    --accent:#6ee7b7;--accent-2:#60a5fa;--warn:#fbbf24;--err:#fca5a5;
+    --font:'Inter',system-ui,-apple-system,sans-serif;--display:'Space Grotesk',var(--font);
+    --mono:'JetBrains Mono',ui-monospace,Consolas,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.6;min-height:100vh;
+    background-image:radial-gradient(900px 500px at 85% -10%,rgba(110,231,183,.12),transparent 60%);background-attachment:fixed}
+  .wrap{max-width:1020px;margin:0 auto;padding:40px 22px 70px}
+  h1{font-family:var(--display);font-size:clamp(26px,5vw,36px);margin:0 0 8px;font-weight:700}
+  h1 .g{color:var(--accent)}
+  .sub{color:var(--muted);font-size:16.5px;margin:0 0 16px;max-width:660px}
+  .privacy{display:flex;gap:13px;background:#0f1d18;border:1px solid #1f4538;border-radius:13px;
+    padding:14px 16px;margin-bottom:22px;font-size:14.5px}
+  .privacy b{color:var(--accent)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:860px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column}
+  .panel h2{font-family:var(--display);font-size:12px;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted);margin:0 0 12px;font-weight:600}
+  textarea,pre{flex:1;min-height:300px;background:var(--soft);color:var(--text);border:1px solid var(--line);
+    border-radius:10px;padding:14px;font-family:var(--mono);font-size:13px;line-height:1.65;margin:0}
+  textarea{resize:vertical;width:100%}textarea:focus{outline:none;border-color:var(--accent)}
+  pre{overflow:auto;white-space:pre-wrap;word-break:break-word}
+  mark{background:#3a2a10;color:#fde68a;border-radius:3px;padding:0 2px}
+  mark.certain{background:#3a1515;color:#fca5a5}
+  mark.possible{background:#1e2a3a;color:#93c5fd}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+  button{font:inherit;font-size:14px;font-weight:600;padding:11px 17px;border-radius:9px;border:1px solid var(--line);
+    background:var(--card);color:var(--text);cursor:pointer;transition:.15s}
+  button:hover{transform:translateY(-1px);border-color:var(--accent)}
+  button.primary{background:var(--accent);color:#07120d;border-color:transparent}
+  .modes{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+  .modes button{font-size:13px;padding:8px 14px;border-radius:999px}
+  .modes button.on{background:var(--accent);color:#07120d;border-color:transparent}
+  .found{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
+  .f{display:flex;align-items:center;gap:10px;background:var(--soft);border:1px solid var(--line);
+    border-radius:9px;padding:8px 12px;font-size:13.5px;cursor:pointer}
+  .f input{margin:0;cursor:pointer}
+  .f .lab{flex:1}
+  .f .n{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .c{font-size:10.5px;font-family:var(--mono);border-radius:999px;padding:2px 8px;border:1px solid}
+  .c.certain{color:var(--err);border-color:#4a1f1f}
+  .c.likely{color:var(--warn);border-color:#4a3c1a}
+  .c.possible{color:var(--accent-2);border-color:#1e3a5f}
+  .stat{font-family:var(--display);font-size:13px;font-weight:600;color:var(--accent);background:var(--soft);
+    border:1px solid var(--line);border-radius:999px;padding:5px 14px;display:inline-block;margin-bottom:14px}
+  .muted{color:var(--muted);font-size:13px}
+  footer{margin-top:32px;text-align:center;color:var(--muted);font-size:13px}
+  footer a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>PII <span class="g">Redactor</span></h1>
+  <p class="sub">Finds emails, payment cards, IBANs, API keys, national IDs, IP addresses and more — then masks them, in whichever style you need.</p>
+
+  <div class="privacy">
+    <span>🔒</span>
+    <span><b>Nothing is uploaded. Ever.</b> All detection and redaction happens in this page, in your browser. There is no server and no network request — you can disconnect your internet and it still works. A redaction tool that sends your document somewhere to redact it would be an oxymoron.</span>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Input</h2>
+      <textarea id="in" spellcheck="false" placeholder="Paste text containing personal data…"></textarea>
+    </div>
+    <div class="panel">
+      <h2>Found <span id="statWrap"></span></h2>
+      <div class="found" id="found"><p class="muted">Paste something, or load the example.</p></div>
+      <h2 style="margin-top:6px">Redaction style</h2>
+      <div class="modes" id="modes">
+        <button data-m="label" class="on">Label — [EMAIL]</button>
+        <button data-m="mask">Mask — •••</button>
+        <button data-m="remove">Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="btns">
+    <button class="primary" id="go">Redact →</button>
+    <button id="example">Load example</button>
+    <button id="copy">Copy result</button>
+    <button id="clear">Clear</button>
+  </div>
+
+  <div class="panel">
+    <h2>Result <span class="muted" id="resNote"></span></h2>
+    <pre id="out"><span class="muted">Redacted text appears here…</span></pre>
+  </div>
+
+  <footer>Built by <a href="https://github.com/realaweayomide">Ayomide Awe</a> · <a href="https://github.com/realaweayomide/pii-redactor">source on GitHub</a></footer>
+</div>
+
+<script src="detect.js"></script>
+<script>
+const $ = id => document.getElementById(id)
+const esc = s => String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))
+let mode = 'label', current = { findings: [], byType: {} }, enabled = new Set(), lastOut = ''
+
+const EXAMPLE = `Dear Marcus Bell,
+
+Thanks for your order. The receipt went to marcus.bell@northwind.co, copied to ops@acme.io.
+Card ending 4111 1111 1111 1111 was charged ₦48,000. (Our old test number 1234 5678 1234 5678 is not a real card.)
+
+Bank details: GB82 WEST 1234 5698 7654 32
+Reach us on +234 803 123 4567 or 0803 123 4567.
+
+Internal only — server 192.168.1.44, API key sk-abcdefghijklmnop1234,
+deploy token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345
+
+Customer SSN 123-45-6789, DOB 14/03/1988, postcode SW1A 1AA.
+
+Regards,
+Dana Okafor`
+
+$('example').onclick = () => { $('in').value = EXAMPLE; scan() }
+$('clear').onclick = () => { $('in').value=''; scan() }
+$('go').onclick = apply
+$('in').addEventListener('input', scan)
+
+$('modes').onclick = e => {
+  const b = e.target.closest('button'); if(!b) return
+  mode = b.dataset.m
+  document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on', x===b))
+  if(lastOut) apply()
+}
+
+$('copy').onclick = () => { if(!lastOut) return
+  navigator.clipboard.writeText(lastOut).then(()=>{ const b=$('copy'); b.textContent='Copied ✓'
+    setTimeout(()=>b.textContent='Copy result',1200) }) }
+
+function scan(){
+  const text = $('in').value
+  current = PII.detect(text)
+  const types = Object.keys(current.byType)
+  enabled = new Set(types.filter(t => current.byType[t][0].confidence !== 'possible' || enabled.has(t)))
+
+  $('statWrap').innerHTML = current.findings.length
+    ? '<span class="stat" style="margin:0 0 0 6px">' + current.findings.length + ' items</span>' : ''
+
+  $('found').innerHTML = types.length
+    ? types.map(t => {
+        const f = current.byType[t]
+        return '<label class="f"><input type="checkbox" data-t="' + t + '"' + (enabled.has(t)?' checked':'') + '>' +
+          '<span class="lab">' + esc(f[0].label) + '</span>' +
+          '<span class="c ' + f[0].confidence + '">' + f[0].confidence + '</span>' +
+          '<span class="n">' + f.length + '</span></label>'
+      }).join('')
+    : '<p class="muted">' + (text.trim() ? 'Nothing detected.' : 'Paste something, or load the example.') + '</p>'
+
+  $('found').onchange = e => {
+    const t = e.target.dataset?.t; if(!t) return
+    e.target.checked ? enabled.add(t) : enabled.delete(t)
+    if(lastOut) apply()
+  }
+  preview()
+}
+
+function preview(){
+  const text = $('in').value
+  if(!current.findings.length){ return }
+  let html = '', last = 0
+  for(const f of [...current.findings].sort((a,b)=>a.start-b.start)){
+    html += esc(text.slice(last, f.start)) + '<mark class="' + f.confidence + '">' + esc(f.value) + '</mark>'
+    last = f.end
+  }
+  html += esc(text.slice(last))
+  $('out').innerHTML = html
+  $('resNote').textContent = '— preview of what was found. Hit Redact to apply.'
+}
+
+function apply(){
+  const text = $('in').value
+  if(!text.trim()){ $('out').innerHTML = '<span class="muted">Paste something first.</span>'; return }
+  lastOut = PII.redact(text, current.findings, mode, [...enabled])
+  $('out').textContent = lastOut
+  const n = current.findings.filter(f => enabled.has(f.type)).length
+  $('resNote').textContent = '— ' + n + ' item' + (n===1?'':'s') + ' redacted'
+}
+
+scan()
+</script>
+</body>
+</html>
